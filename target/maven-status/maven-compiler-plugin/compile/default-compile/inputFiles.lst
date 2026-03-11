@@ -1,13 +1,14 @@
 C:\Users\Wilma\Desktop\Software Engineer\ElevatedPulseRTD\src\main\java\com\elevatedpulse\rtd\controller\EventController.java
-C:\Users\Wilma\Desktop\Software Engineer\ElevatedPulseRTD\src\main\java\com\elevatedpulse\rtd\controller\WebSocketConfig.java
+C:\Users\Wilma\Desktop\Software Engineer\ElevatedPulseRTD\src\main\java\com\elevatedpulse\rtd\config\InfluxDBProperties.java
 C:\Users\Wilma\Desktop\Software Engineer\ElevatedPulseRTD\src\main\java\com\elevatedpulse\rtd\ElevatedPulseRtdApplication.java
-C:\Users\Wilma\Desktop\Software Engineer\ElevatedPulseRTD\src\main\java\com\elevatedpulse\rtd\controller\InfluxDBConfig.java
 C:\Users\Wilma\Desktop\Software Engineer\ElevatedPulseRTD\src\main\java\com\elevatedpulse\rtd\consumer\InfluxDBWriter.java
 C:\Users\Wilma\Desktop\Software Engineer\ElevatedPulseRTD\src\main\java\com\elevatedpulse\rtd\model\MetricAggregate.java
 C:\Users\Wilma\Desktop\Software Engineer\ElevatedPulseRTD\src\main\java\com\elevatedpulse\rtd\consumer\AlertConsumer.java
-C:\Users\Wilma\Desktop\Software Engineer\ElevatedPulseRTD\src\main\java\com\elevatedpulse\rtd\controller\KafkaStreamsConfig.java
+C:\Users\Wilma\Desktop\Software Engineer\ElevatedPulseRTD\src\main\java\com\elevatedpulse\rtd\config\InfluxDBConfig.java
 C:\Users\Wilma\Desktop\Software Engineer\ElevatedPulseRTD\src\main\java\com\elevatedpulse\rtd\model\CpuMetricEvent.java
+C:\Users\Wilma\Desktop\Software Engineer\ElevatedPulseRTD\src\main\java\com\elevatedpulse\rtd\config\WebSocketConfig.java
 C:\Users\Wilma\Desktop\Software Engineer\ElevatedPulseRTD\src\main\java\com\elevatedpulse\rtd\model\PageViewEvent.java
 C:\Users\Wilma\Desktop\Software Engineer\ElevatedPulseRTD\src\main\java\com\elevatedpulse\rtd\service\StatsService.java
+C:\Users\Wilma\Desktop\Software Engineer\ElevatedPulseRTD\src\main\java\com\elevatedpulse\rtd\config\KafkaStreamsConfig.java
 C:\Users\Wilma\Desktop\Software Engineer\ElevatedPulseRTD\src\main\java\com\elevatedpulse\rtd\controller\RangeController.java
 C:\Users\Wilma\Desktop\Software Engineer\ElevatedPulseRTD\src\main\java\com\elevatedpulse\rtd\model\Alert.java

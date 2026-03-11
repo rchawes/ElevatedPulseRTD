@@ -6,6 +6,7 @@ com\elevatedpulse\rtd\ElevatedPulseRtdApplication.class
 com\elevatedpulse\rtd\controller\RangeController.class
 com\elevatedpulse\rtd\model\Alert.class
 com\elevatedpulse\rtd\service\StatsService.class
+com\elevatedpulse\rtd\config\InfluxDBProperties.class
 com\elevatedpulse\rtd\config\WebSocketConfig.class
 com\elevatedpulse\rtd\consumer\InfluxDBWriter.class
 com\elevatedpulse\rtd\controller\EventController.class
