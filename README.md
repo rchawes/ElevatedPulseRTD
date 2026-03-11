@@ -7,7 +7,9 @@
 
 > **Real-time dashboard for monitoring system metrics, business KPIs, and custom events using Kafka Streams, InfluxDB, and WebSocket.**
 
-![Dashboard Preview](docs/dashboard-preview.png)
+## Dashboard
+![Preview 1](https://github.com/rchawes/ElevatedPulseRTD/blob/main/ElevatedPulseRTDss1.png)
+![Preview 1](https://github.com/rchawes/ElevatedPulseRTD/blob/main/ElevatedPulseRTDss2.png)
 
 ## ✨ Features
 
