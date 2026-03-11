@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elevated Pulse RTD</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SockJS & STOMP -->
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- PapaParse for CSV export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        /* CSS Variables for theming */
+        :root {
+            --bg-primary: #f3f4f6;
+            --text-primary: #1f2937;
+            --card-bg: #ffffff;
+            --card-border: #e5e7eb;
+            --button-bg: #e5e7eb;
+            --button-hover: #d1d5db;
+            --th-bg: #e5e7eb;
+            --divide-color: #e5e7eb;
+        }
+
+        .dark-mode {
+            --bg-primary: #111827;
+            --text-primary: #f3f4f6;
+            --card-bg: #1f2937;
+            --card-border: #374151;
+            --button-bg: #374151;
+            --button-hover: #4b5563;
+            --th-bg: #374151;
+            --divide-color: #374151;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            transition: background-color 0.3s, color 0.3s;
+            margin: 0;
+            padding: 1.5rem;
+        }
+
+        .card, .table-container {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+
+        button {
+            background-color: var(--button-bg);
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: var(--button-hover);
+        }
+
+        th {
+            background-color: var(--th-bg);
+        }
+
+        .divide-y > * + * {
+            border-top: 1px solid var(--divide-color);
+        }
+
+        canvas {
+            max-width: 100%;
+            height: auto !important;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 200px;
+        }
+
+        /* Modal background */
+        #settingsModal {
+            transition: opacity 0.3s;
+        }
+    </style>
+</head>
+<body>
+<div class="container mx-auto">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold">Elevated Pulse RTD</h1>
+        <button id="darkModeToggle" class="p-2 rounded-lg">
+            <i id="darkModeIcon" class="fas fa-moon"></i>
+        </button>
+    </div>
+
+    <!-- Alerts container -->
+    <div id="alertContainer" class="mb-4"></div>
+
+    <!-- Loading spinner -->
+    <div id="loadingSpinner" class="hidden flex justify-center my-4">
+        <i class="fas fa-spinner fa-spin text-2xl"></i>
+    </div>
+
+    <!-- Page Views Bar Chart with filters -->
+    <div class="mb-8">
+        <div class="flex justify-between items-center">
+            <h2 class="text-xl font-semibold mb-2">Page Views (last minute)</h2>
+            <div id="pageViewFilters" class="flex flex-wrap gap-2"></div>
+        </div>
+        <div class="card rounded-lg shadow p-4">
+            <div class="chart-container">
+                <canvas id="pageViewsBar"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- CPU Bar Chart with filters -->
+    <div class="mb-8">
+        <div class="flex justify-between items-center">
+            <h2 class="text-xl font-semibold mb-2">CPU Usage % (last minute)</h2>
+            <div id="cpuFilters" class="flex flex-wrap gap-2"></div>
+        </div>
+        <div class="card rounded-lg shadow p-4">
+            <div class="chart-container">
+                <canvas id="cpuBar"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Historical Trends -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div class="card rounded-lg shadow p-4">
+            <h2 class="text-xl font-semibold mb-2">Page Views Trend (last 10 mins)</h2>
+            <div class="chart-container">
+                <canvas id="pageViewsLine"></canvas>
+            </div>
+        </div>
+        <div class="card rounded-lg shadow p-4">
+            <h2 class="text-xl font-semibold mb-2">CPU Trend (last 10 mins)</h2>
+            <div class="chart-container">
+                <canvas id="cpuLine"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Latest Aggregates Table and Export -->
+    <div class="card rounded-lg shadow p-4 table-container">
+        <div class="flex justify-between items-center mb-2">
+            <h2 class="text-xl font-semibold">Latest Aggregates</h2>
+            <button id="exportCsvBtn" class="px-4 py-2 bg-green-500 text-white rounded text-sm">Export CSV</button>
+        </div>
+        <table class="min-w-full table-auto">
+            <thead>
+            <tr>
+                <th class="px-4 py-2 text-left">Metric</th>
+                <th class="px-4 py-2 text-left">Dimension</th>
+                <th class="px-4 py-2 text-left">Value</th>
+                <th class="px-4 py-2 text-left">Window</th>
+            </tr>
+            </thead>
+            <tbody id="aggregatesTable" class="divide-y">
+            <!-- rows inserted dynamically -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Settings Modal -->
+<div id="settingsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+    <div class="card rounded-lg p-6 w-96">
+        <h2 class="text-xl font-bold mb-4">Settings</h2>
+        <div class="mb-4">
+            <label class="block mb-2">Time Range</label>
+            <select id="modalTimeRange" class="w-full p-2 rounded border">
+                <option value="1">Last 1 minute</option>
+                <option value="5">Last 5 minutes</option>
+                <option value="10" selected>Last 10 minutes</option>
+                <option value="30">Last 30 minutes</option>
+                <option value="60">Last 1 hour</option>
+            </select>
+        </div>
+        <div class="mb-4">
+            <label class="block mb-2">Refresh Rate (backend required)</label>
+            <select id="modalRefreshRate" class="w-full p-2 rounded border" disabled>
+                <option value="2000">2 sec</option>
+                <option value="5000" selected>5 sec</option>
+                <option value="10000">10 sec</option>
+                <option value="30000">30 sec</option>
+            </select>
+            <p class="text-xs text-gray-500 mt-1">(Requires backend implementation)</p>
+        </div>
+        <div class="mb-4">
+            <label class="flex items-center">
+                <input type="checkbox" id="modalDarkMode" class="mr-2">
+                Dark Mode
+            </label>
+        </div>
+        <div class="flex justify-end gap-2">
+            <button id="closeModalBtn" class="px-4 py-2 rounded">Cancel</button>
+            <button id="saveSettingsBtn" class="px-4 py-2 bg-blue-500 text-white rounded">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- Gear icon to open modal -->
+<button id="openSettingsBtn" class="fixed bottom-4 right-4 p-3 rounded-full shadow-lg bg-gray-200 dark:bg-gray-700">
+    <i class="fas fa-cog"></i>
+</button>
+
+<script>
+    // ========== Global variables ==========
+    let latestStats = [];
+    const history = {
+        pageViews: [],
+        cpu: []
+    };
+
+    // ========== Dark Mode Toggle ==========
+    const darkModeToggle = document.getElementById('darkModeToggle');
+    const darkModeIcon = document.getElementById('darkModeIcon');
+    const body = document.body;
+
+    function setDarkMode(enabled) {
+        if (enabled) {
+            body.classList.add('dark-mode');
+            darkModeIcon.className = 'fas fa-sun';
+            localStorage.setItem('darkMode', 'enabled');
+        } else {
+            body.classList.remove('dark-mode');
+            darkModeIcon.className = 'fas fa-moon';
+            localStorage.setItem('darkMode', 'disabled');
+        }
+        const modalCheck = document.getElementById('modalDarkMode');
+        if (modalCheck) modalCheck.checked = enabled;
+    }
+
+    const savedDarkMode = localStorage.getItem('darkMode');
+    if (savedDarkMode === 'enabled') {
+        setDarkMode(true);
+    } else if (savedDarkMode === 'disabled') {
+        setDarkMode(false);
+    } else {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        setDarkMode(prefersDark);
+    }
+
+    darkModeToggle.addEventListener('click', () => {
+        setDarkMode(!body.classList.contains('dark-mode'));
+    });
+
+    // ========== Chart Initialization ==========
+    const pageViewsBarCtx = document.getElementById('pageViewsBar').getContext('2d');
+    const pageViewsBar = new Chart(pageViewsBarCtx, {
+        type: 'bar',
+        data: { labels: [], datasets: [{
+            label: 'Page Views',
+            data: [],
+            backgroundColor: (context) => {
+                const ctx = context.chart.ctx;
+                const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+                gradient.addColorStop(0, 'rgba(75, 192, 192, 0.8)');
+                gradient.addColorStop(1, 'rgba(75, 192, 192, 0.2)');
+                return gradient;
+            },
+            borderColor: 'rgba(75, 192, 192, 1)',
+            borderWidth: 2,
+            borderRadius: 5,
+        }] },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 1000, easing: 'easeOutQuart' },
+            plugins: {
+                tooltip: {
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    titleColor: '#fff',
+                    bodyColor: '#ddd',
+                    callbacks: {
+                        label: (context) => `${context.dataset.label}: ${context.raw}`
+                    }
+                }
+            },
+            scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.1)' } } }
+        }
+    });
+
+    const cpuBarCtx = document.getElementById('cpuBar').getContext('2d');
+    const cpuBar = new Chart(cpuBarCtx, {
+        type: 'bar',
+        data: { labels: [], datasets: [{
+            label: 'CPU %',
+            data: [],
+            backgroundColor: (context) => {
+                const ctx = context.chart.ctx;
+                const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+                gradient.addColorStop(0, 'rgba(255, 99, 132, 0.8)');
+                gradient.addColorStop(1, 'rgba(255, 99, 132, 0.2)');
+                return gradient;
+            },
+            borderColor: 'rgba(255, 99, 132, 1)',
+            borderWidth: 2,
+            borderRadius: 5,
+        }] },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 1000, easing: 'easeOutQuart' },
+            plugins: {
+                tooltip: {
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    titleColor: '#fff',
+                    bodyColor: '#ddd',
+                    callbacks: {
+                        label: (context) => `${context.dataset.label}: ${context.raw}%`
+                    }
+                }
+            },
+            scales: { y: { beginAtZero: true, max: 100, grid: { color: 'rgba(0,0,0,0.1)' } } }
+        }
+    });
+
+    const pageViewsLineCtx = document.getElementById('pageViewsLine').getContext('2d');
+    const pageViewsLine = new Chart(pageViewsLineCtx, {
+        type: 'line',
+        data: { labels: [], datasets: [] },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 1000, easing: 'easeOutQuart' },
+            plugins: {
+                tooltip: { mode: 'index', intersect: false },
+                legend: { display: true }
+            },
+            scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.1)' } } },
+            elements: { line: { tension: 0.4 } }
+        }
+    });
+
+    const cpuLineCtx = document.getElementById('cpuLine').getContext('2d');
+    const cpuLine = new Chart(cpuLineCtx, {
+        type: 'line',
+        data: { labels: [], datasets: [] },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 1000, easing: 'easeOutQuart' },
+            plugins: {
+                tooltip: { mode: 'index', intersect: false },
+                legend: { display: true }
+            },
+            scales: { y: { beginAtZero: true, max: 100, grid: { color: 'rgba(0,0,0,0.1)' } } },
+            elements: { line: { tension: 0.4 } }
+        }
+    });
+
+    // ========== WebSocket Connection ==========
+    const socket = new SockJS('/ws');
+    const stompClient = Stomp.over(socket);
+    stompClient.connect({}, function(frame) {
+        console.log('Connected: ' + frame);
+        document.getElementById('loadingSpinner').classList.add('hidden');
+        stompClient.subscribe('/topic/stats', function(message) {
+            latestStats = JSON.parse(message.body);
+            updateDashboard(latestStats);
+        });
+        stompClient.subscribe('/topic/alerts', function(message) {
+            const alert = JSON.parse(message.body);
+            showAlert(alert.message, alert.level);
+        });
+    });
+
+    document.getElementById('loadingSpinner').classList.remove('hidden');
+
+    // ========== UI Update Functions ==========
+    function updateDashboard(stats) {
+        updateFilters(stats);
+        applyFiltersAndUpdateCharts();
+        updateHistory(stats);
+        if (stats.length > 0) {
+            document.getElementById('loadingSpinner').classList.add('hidden');
+        }
+    }
+
+    function updateTable(stats) {
+        const tbody = document.getElementById('aggregatesTable');
+        tbody.innerHTML = '';
+        stats.forEach(stat => {
+            const row = document.createElement('tr');
+            row.className = 'border-b';
+            row.innerHTML = `
+                <td class="px-4 py-2">${stat.name}</td>
+                <td class="px-4 py-2">${stat.dimension}</td>
+                <td class="px-4 py-2">${stat.value.toFixed(2)}</td>
+                <td class="px-4 py-2">${new Date(stat.windowStart).toLocaleTimeString()} - ${new Date(stat.windowEnd).toLocaleTimeString()}</td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    function updateHistory(stats) {
+        const now = new Date().toLocaleTimeString();
+
+        const pageViewsMap = {};
+        stats.filter(s => s.name === 'page_views').forEach(s => {
+            pageViewsMap[s.dimension] = s.value;
+        });
+        history.pageViews.push({ label: now, values: pageViewsMap });
+        if (history.pageViews.length > 10) history.pageViews.shift();
+
+        const cpuMap = {};
+        stats.filter(s => s.name === 'cpu_usage').forEach(s => {
+            cpuMap[s.dimension] = s.value;
+        });
+        history.cpu.push({ label: now, values: cpuMap });
+        if (history.cpu.length > 10) history.cpu.shift();
+
+        updateLineChart(pageViewsLine, history.pageViews);
+        updateLineChart(cpuLine, history.cpu);
+    }
+
+    function updateLineChart(chart, historyData) {
+        const dimensions = new Set();
+        historyData.forEach(point => {
+            Object.keys(point.values).forEach(dim => dimensions.add(dim));
+        });
+        const dims = Array.from(dimensions);
+
+        const datasets = dims.map(dim => {
+            const data = historyData.map(point => point.values[dim] || 0);
+            const hue = (dims.indexOf(dim) * 60) % 360;
+            return {
+                label: dim,
+                data: data,
+                borderColor: `hsl(${hue}, 70%, 50%)`,
+                backgroundColor: `hsla(${hue}, 70%, 50%, 0.1)`,
+                fill: true,
+                tension: 0.4
+            };
+        });
+
+        chart.data.labels = historyData.map(p => p.label);
+        chart.data.datasets = datasets;
+        chart.update();
+    }
+
+    // ========== Filter Management ==========
+    function updateFilters(stats) {
+        const pageViewDims = [...new Set(stats.filter(s => s.name === 'page_views').map(s => s.dimension))];
+        const cpuDims = [...new Set(stats.filter(s => s.name === 'cpu_usage').map(s => s.dimension))];
+
+        const pageFilterDiv = document.getElementById('pageViewFilters');
+        const cpuFilterDiv = document.getElementById('cpuFilters');
+
+        function buildFilterDiv(div, dims, type) {
+            div.innerHTML = '';
+            dims.forEach(dim => {
+                const label = document.createElement('label');
+                label.className = 'inline-flex items-center mr-3 text-sm';
+                label.innerHTML = `<input type="checkbox" value="${dim}" checked class="mr-1 filter-checkbox" data-type="${type}">${dim}`;
+                div.appendChild(label);
+            });
+        }
+
+        buildFilterDiv(pageFilterDiv, pageViewDims, 'page_views');
+        buildFilterDiv(cpuFilterDiv, cpuDims, 'cpu_usage');
+
+        document.querySelectorAll('.filter-checkbox').forEach(cb => {
+            cb.addEventListener('change', applyFiltersAndUpdateCharts);
+        });
+    }
+
+    function applyFiltersAndUpdateCharts() {
+        const pageViewCbs = document.querySelectorAll('.filter-checkbox[data-type="page_views"]');
+        const cpuCbs = document.querySelectorAll('.filter-checkbox[data-type="cpu_usage"]');
+
+        const selectedPageViews = Array.from(pageViewCbs).filter(cb => cb.checked).map(cb => cb.value);
+        const selectedCpu = Array.from(cpuCbs).filter(cb => cb.checked).map(cb => cb.value);
+
+        const filteredPageViews = latestStats.filter(s => s.name === 'page_views' && selectedPageViews.includes(s.dimension));
+        const filteredCpu = latestStats.filter(s => s.name === 'cpu_usage' && selectedCpu.includes(s.dimension));
+
+        if (filteredPageViews.length > 0) {
+            pageViewsBar.data.labels = filteredPageViews.map(p => p.dimension);
+            pageViewsBar.data.datasets[0].data = filteredPageViews.map(p => p.value);
+            pageViewsBar.update();
+        } else {
+            pageViewsBar.data.labels = [];
+            pageViewsBar.data.datasets[0].data = [];
+            pageViewsBar.update();
+        }
+
+        if (filteredCpu.length > 0) {
+            cpuBar.data.labels = filteredCpu.map(c => c.dimension);
+            cpuBar.data.datasets[0].data = filteredCpu.map(c => c.value);
+            cpuBar.update();
+        } else {
+            cpuBar.data.labels = [];
+            cpuBar.data.datasets[0].data = [];
+            cpuBar.update();
+        }
+
+        updateTable(latestStats);
+    }
+
+    // ========== Alerts ==========
+    function showAlert(message, level) {
+        const container = document.getElementById('alertContainer');
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `p-4 mb-2 rounded ${level === 'critical' ? 'bg-red-500' : 'bg-yellow-500'} text-white`;
+        alertDiv.textContent = message;
+        container.appendChild(alertDiv);
+        setTimeout(() => alertDiv.remove(), 10000);
+    }
+
+    // ========== CSV Export ==========
+    document.getElementById('exportCsvBtn').addEventListener('click', () => {
+        if (!latestStats || latestStats.length === 0) return;
+        const csv = Papa.unparse(latestStats);
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `dashboard-${new Date().toISOString()}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+
+    // ========== Settings Modal ==========
+    const modal = document.getElementById('settingsModal');
+    const openBtn = document.getElementById('openSettingsBtn');
+    const closeBtn = document.getElementById('closeModalBtn');
+    const saveBtn = document.getElementById('saveSettingsBtn');
+    const modalTimeRange = document.getElementById('modalTimeRange');
+    const modalDarkMode = document.getElementById('modalDarkMode');
+
+    openBtn.addEventListener('click', () => {
+        modalDarkMode.checked = body.classList.contains('dark-mode');
+        modal.classList.remove('hidden');
+    });
+
+    closeBtn.addEventListener('click', () => {
+        modal.classList.add('hidden');
+    });
+
+    saveBtn.addEventListener('click', () => {
+        const dark = modalDarkMode.checked;
+        setDarkMode(dark);
+        const range = parseInt(modalTimeRange.value);
+        stompClient.send('/app/setRange', {}, range);
+        modal.classList.add('hidden');
+    });
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.classList.add('hidden');
+        }
+    });
+
+    // ========== Keyboard Shortcuts ==========
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'd' || e.key === 'D') {
+            setDarkMode(!body.classList.contains('dark-mode'));
+        }
+        if (e.key === 's' || e.key === 'S') {
+            openBtn.click();
+        }
+    });
+</script>
+</body>
+</html>
